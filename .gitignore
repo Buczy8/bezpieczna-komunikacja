@@ -1,0 +1,41 @@
+
+# Python - pliki tymczasowe i skompilowane
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Środowiska wirtualne
+venv/
+env/
+.env/
+.venv/
+Pipfile.lock
+requirements.txt.log
+
+# Zmienne środowiskowe i sekrety
+.env
+.flaskenv
+
+# Certyfikaty i klucze kryptograficzne (SSL/TLS)
+*.key
+
+# Żądania podpisania certyfikatu
+*.csr
+
+# Pliki numerów seryjnych CA
+*.srl
+
+# Wygenerowane certyfikaty i łańcuchy certyfikatów
+# *.crt
+# *.pem
+# *.der
+
+# Pliki IDE i edytorów
+.vscode/
+.idea/
+*.swp
+
+# Systemowe pliki
+.DS_Store
+Thumbs.db
