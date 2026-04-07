@@ -27,9 +27,9 @@ requirements.txt.log
 *.srl
 
 # Wygenerowane certyfikaty i łańcuchy certyfikatów
-# *.crt
-# *.pem
-# *.der
+*.crt
+*.pem
+*.der
 
 # Pliki IDE i edytorów
 .vscode/
