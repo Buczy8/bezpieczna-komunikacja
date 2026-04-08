@@ -12,7 +12,7 @@ def start_client():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
     # Dodaje certyfikat do magazynu zaufania klienta
-    context.load_verify_locations('cert.pem')
+    context.load_verify_locations('CA/ca-cert.pem')
 
     # Wyłącza weryfikację nazwy hosta
     context.check_hostname = False

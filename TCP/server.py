@@ -12,7 +12,7 @@ def start_server():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 
     # Certyfikat i klucz identyfikują serwer podczas handshake TLS
-    context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
+    context.load_cert_chain(certfile="CA/server-cert.pem", keyfile="CA/server-key.pem")
 
     # Gniazdo TCP IPv4 odbiera nowe połączenia od klientów
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
