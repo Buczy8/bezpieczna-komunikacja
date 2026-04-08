@@ -12,13 +12,13 @@ def start_client():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
     # Dodaje certyfikat do magazynu zaufania klienta
-    context.load_verify_locations('CA/ca.crt')
+    context.load_verify_locations('../Certs/CA/ca.crt')
 
     # Wyłącza weryfikację nazwy hosta
     context.check_hostname = True
 
     # Klient ładuje swoją własną tożsamość, aby przedstawić się serwerowi
-    context.load_cert_chain(certfile="CA/client.crt", keyfile="CA/client.key")
+    context.load_cert_chain(certfile="../Certs/CA/client.crt", keyfile="../Certs/CA/client.key")
 
     # Gniazdo TCP IPv4 zestawia transport do serwera
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
