@@ -3,7 +3,7 @@ import socket
 import ssl
 
 # Endpoint serwera TCP
-HOST = '127.0.0.2'
+HOST = 'localhost'
 PORT = 8888
 
 
@@ -12,7 +12,13 @@ def start_server():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 
     # Certyfikat i klucz identyfikują serwer podczas handshake TLS
-    context.load_cert_chain(certfile="CA/server-cert.pem", keyfile="CA/server-key.pem")
+    context.load_cert_chain(certfile="CA/server.crt", keyfile="CA/server.key")
+
+    # Serwer wymaga certyfikatu od klienta
+    context.verify_mode = ssl.CERT_REQUIRED
+
+    # Serwer ufa tylko klientom, których certyfikat został wydany przez to CA
+    context.load_verify_locations('CA/ca.crt')
 
     # Gniazdo TCP IPv4 odbiera nowe połączenia od klientów
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:

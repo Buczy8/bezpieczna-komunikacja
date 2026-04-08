@@ -18,12 +18,15 @@ Bezpieczna komunikacja/
     ├── client.py
     ├── server.py
     ├── CA/
-    │   ├── ca-cert.pem
-    │   ├── ca-cert.srl
-    │   ├── ca-key.pem
-    │   ├── server-cert.pem
-    │   ├── server-key.pem
-    │   └── server.csr
+    │   ├── ca.crt
+    │   ├── ca.key
+    │   ├── ca.srl
+    │   ├── client.crt
+    │   ├── client.csr
+    │   ├── client.key
+    │   ├── server.crt
+    │   ├── server.csr
+    │   └── server.key
     └── Self signed/
         ├── cert.pem
         └── key.pem
@@ -39,10 +42,19 @@ Bezpieczna komunikacja/
 
 Najpierw tworzysz własne CA, potem generujesz klucz i żądanie certyfikatu dla serwera, a następnie podpisujesz to żądanie certyfikatem CA.
 
+Ten wariant zapewnia **uwierzytelnianie serwera**: klient sprawdza, czy certyfikat serwera został podpisany przez zaufane CA.
+
+Jeśli chcesz zrobić **obustronne uwierzytelnianie** (**mTLS**), dopisz jeszcze certyfikat klienta podpisany przez to samo CA i ustaw serwer tak, żeby wymagał certyfikatu klienta.
+### Co daje mTLS
+
+- serwer potwierdza tożsamość klienta,
+- klient potwierdza tożsamość serwera,
+- połączenie działa tylko dla certyfikatów wystawionych przez zaufane CA.
+
 ### 1. Wejdź do katalogu projektu
 
 ```bash
-cd "/home/pawel/Dokumenty/Studia/Semestr 6/Programowanie usług sieciowych/Projekty/Bezpieczna komunikacja"
+cd "/sciezka/do/projektu/Bezpieczna komunikacja"
 ```
 
 ### 2. Utwórz katalog na pliki CA
@@ -55,7 +67,7 @@ cd TCP/CA
 ### 3. Wygeneruj klucz prywatny CA
 
 ```bash
-openssl genrsa -out ca-key.pem 4096
+openssl genrsa -out ca.key 2048
 ```
 
 Ten plik jest tajny. Służy do podpisywania certyfikatów.
@@ -63,7 +75,7 @@ Ten plik jest tajny. Służy do podpisywania certyfikatów.
 ### 4. Wygeneruj certyfikat CA
 
 ```bash
-openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 -out ca-cert.pem -subj "/CN=Local Test CA"
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt
 ```
 
 To publiczny certyfikat CA. Ten plik dodajesz do zaufanych po stronie klienta.
@@ -71,7 +83,7 @@ To publiczny certyfikat CA. Ten plik dodajesz do zaufanych po stronie klienta.
 ### 5. Wygeneruj klucz prywatny serwera
 
 ```bash
-openssl genrsa -out server-key.pem 2048
+openssl genrsa -out server.key 2048
 ```
 
 To tajny klucz serwera. Musi pozostać na komputerze, na którym działa serwer.
@@ -79,39 +91,49 @@ To tajny klucz serwera. Musi pozostać na komputerze, na którym działa serwer.
 ### 6. Wygeneruj żądanie podpisania certyfikatu dla serwera
 
 ```bash
-openssl req -new -key server-key.pem -out server.csr -subj "/CN=127.0.0.2"
+openssl req -new -key server.key -out server.csr
 ```
 
-Plik `server.csr` zawiera dane potrzebne do wystawienia certyfikatu serwera.
+Gdy konsola spyta o CN to trzeba podać `localhost`. Plik `server.csr` zawiera dane potrzebne do wystawienia certyfikatu serwera.
 
 ### 7. Podpisz żądanie certyfikatem CA
 
 ```bash
-openssl x509 -req -in server.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -days 825 -sha256
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365 -sha25
 ```
 
 Wynikiem jest `server-cert.pem`, czyli certyfikat serwera podpisany przez lokalne CA.
 
+### 8. Wygeneruj certyfikat klienta
+
+W katalogu `TCP/CA/` analogicznie do serwera wykonaj:
+
+```bash
+openssl genrsa -out client.key 2048
+openssl req -new -key client.key -out client.csr
+openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 365 -sha256
+```
+
 ## Co oznaczają wygenerowane pliki
 
-### `TCP/CA/ca-key.pem`
+### `TCP/CA/ca.key`
 
 - prywatny klucz CA,
 - używany do podpisywania certyfikatów,
 - nie powinien być udostępniany.
 
-### `TCP/CA/ca-cert.pem`
+### `TCP/CA/ca.crt`
 
 - publiczny certyfikat CA,
 - klient używa go do sprawdzenia, czy certyfikat serwera został podpisany przez zaufane CA.
 
-### `TCP/CA/ca-cert.srl`
+### `TCP/CA/ca.srl`
 
 - plik z numerem seryjnym,
 - OpenSSL używa go przy wystawianiu kolejnych certyfikatów,
 - pozwala utrzymać unikalne numery seryjne certyfikatów.
 
-### `TCP/CA/server-key.pem`
+### `TCP/CA/server.key`
 
 - prywatny klucz serwera,
 - służy serwerowi do potwierdzenia własnej tożsamości podczas handshake TLS.
@@ -122,11 +144,12 @@ Wynikiem jest `server-cert.pem`, czyli certyfikat serwera podpisany przez lokaln
 - zawiera publiczną część klucza serwera i dane identyfikacyjne,
 - trafia do CA w celu podpisania.
 
-### `TCP/CA/server-cert.pem`
+### `TCP/CA/server.crt`
 
 - certyfikat serwera podpisany przez CA,
 - to właśnie ten plik serwer ładuje podczas startu TLS.
 
+Analogicznie działają pliki z klietem
 ## Wariant self-signed
 
 Katalog `TCP/Self signed/` zawiera prostszy wariant testowy, w którym serwer używa certyfikatu self-signed.
@@ -176,7 +199,7 @@ python3 client.py
 
 ## Najważniejsze ustawienia
 
-- `HOST = '127.0.0.2'`
+- `HOST = 'localhost'`
 - `PORT = 8888`
 
 Jeżeli zmienisz adres lub port w kodzie, musisz zrobić to w `server.py` i `client.py`.
