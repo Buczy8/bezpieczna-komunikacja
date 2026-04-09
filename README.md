@@ -1,12 +1,14 @@
-# Bezpieczna komunikacja TCP z TLS i własnym CA
+# Bezpieczna komunikacja TCP i QUIC z TLS i własnym CA
 
-Ten projekt pokazuje komunikację **TCP klient-serwer** zabezpieczoną warstwą **TLS**.
+Ten projekt pokazuje komunikację **TCP klient-serwer** oraz **QUIC klient-serwer** zabezpieczoną warstwą **TLS**.
 Serwer korzysta z certyfikatu podpisanego przez lokalne **CA** (Certification Authority), a klient ufa temu CA.
 
 ## Co robi projekt
 
 - `TCP/server.py` uruchamia serwer TCP i otwiera połączenie TLS.
 - `TCP/client.py` łączy się z serwerem, wykonuje handshake TLS i wysyła wiadomości.
+- `QUIC/server.py` uruchamia serwer QUIC (UDP + TLS 1.3).
+- `QUIC/client.py` łączy się z serwerem QUIC i wysyła wiadomości strumieniami.
 - Cała komunikacja aplikacyjna jest szyfrowana.
 
 ## Struktura katalogów
@@ -22,12 +24,16 @@ Bezpieczna komunikacja/
 │   │   ├── client.crt
 │   │   ├── client.csr
 │   │   ├── client.key
+│   │   ├── san.cnf
 │   │   ├── server.crt
 │   │   ├── server.csr
 │   │   └── server.key
 │   └── Self signed/
 │       ├── cert.pem
 │       └── key.pem
+├── QUIC/
+│   ├── client.py
+│   └── server.py
 └── TCP/
     ├── client.py
     └── server.py
@@ -105,6 +111,12 @@ openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out s
 
 Wynikiem jest `server.crt`, czyli certyfikat serwera podpisany przez lokalne CA.
 
+Jeśli chcesz jawnie dodać SAN z pliku konfiguracyjnego, możesz użyć wariantu:
+
+```bash
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365 -sha256 -extfile san.cnf -extensions v3_req
+```
+
 ### 8. Wygeneruj certyfikat klienta
 
 W katalogu `Certs/CA/` analogicznie do serwera wykonaj:
@@ -133,6 +145,12 @@ openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out c
 - plik z numerem seryjnym,
 - OpenSSL używa go przy wystawianiu kolejnych certyfikatów,
 - pozwala utrzymać unikalne numery seryjne certyfikatów.
+
+### `Certs/CA/san.cnf`
+
+- plik konfiguracyjny OpenSSL z ustawieniami rozszerzeń certyfikatu,
+- najczęściej definiuje `subjectAltName` (SAN), np. `DNS:localhost`, `IP:127.0.0.1`,
+- dzięki temu weryfikacja hosta po stronie klienta działa poprawnie przy `check_hostname = True`.
 
 ### `Certs/CA/server.key`
 
@@ -191,11 +209,26 @@ cd "/home/pawel/Dokumenty/Studia/Semestr 6/Programowanie usług sieciowych/Proje
 python3 client.py
 ```
 
+### 3. (Opcjonalnie) wariant QUIC
+
+W dwóch osobnych terminalach:
+
+```bash
+cd "/home/pawel/Dokumenty/Studia/Semestr 6/Programowanie usług sieciowych/Projekty/Bezpieczna komunikacja/QUIC"
+python3 server.py
+```
+
+```bash
+cd "/home/pawel/Dokumenty/Studia/Semestr 6/Programowanie usług sieciowych/Projekty/Bezpieczna komunikacja/QUIC"
+python3 client.py
+```
+
 ## Co dzieje się w kodzie
 
-- serwer tworzy kontekst TLS i ładuje `../Certs/CA/server.crt` oraz `../Certs/CA/server.key`,
-- klient ładuje `../Certs/CA/ca.crt` do magazynu zaufania,
-- klient ładuje własny certyfikat `../Certs/CA/client.crt` i klucz `../Certs/CA/client.key`,
+- pliki `.py` wyliczają ścieżki certyfikatów dynamicznie przez `Path(__file__).resolve()`,
+- serwer TCP/QUIC ładuje certyfikat i klucz serwera z `Certs/CA/`,
+- klient TCP/QUIC ładuje `ca.crt` do magazynu zaufania,
+- klient TCP ładuje też własny certyfikat i klucz (`client.crt`, `client.key`) do mTLS,
 - podczas połączenia wykonywany jest handshake TLS,
 - po jego zakończeniu dane są wysyłane w zaszyfrowanym kanale.
 
