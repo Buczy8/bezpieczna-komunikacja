@@ -17,19 +17,20 @@ requirements.txt.log
 .env
 .flaskenv
 
-# Certyfikaty i klucze kryptograficzne (SSL/TLS)
-*.key
+# Wygenerowane artefakty PKI (sekrety i materiały runtime)
+Certs/**/*.key
+Certs/**/*.csr
+Certs/**/*.srl
+Certs/**/*.crt
+Certs/**/*.pem
+Certs/**/*.der
+Certs/**/*.p12
+Certs/**/*.pfx
 
-# Żądania podpisania certyfikatu
-*.csr
-
-# Pliki numerów seryjnych CA
-*.srl
-
-# Wygenerowane certyfikaty i łańcuchy certyfikatów
-*.crt
-*.pem
-*.der
+# Jawnie zostawiamy szablony i dokumentację PKI
+!Certs/**/*.cnf
+!Certs/**/README.md
+!Certs/**/*.example
 
 # Pliki IDE i edytorów
 .vscode/

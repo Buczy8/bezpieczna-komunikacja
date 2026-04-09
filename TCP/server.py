@@ -6,6 +6,7 @@ from pathlib import Path
 # Endpoint serwera TCP
 HOST = 'localhost'
 PORT = 8888
+ALPN_PROTOCOLS = ['secure-chat/1']
 
 # Katalog, w którym leży ten plik (`TCP/`)
 BASE_DIR = Path(__file__).resolve().parent
@@ -19,18 +20,36 @@ SERVER_KEY = CA_DIR / "server.key"
 CA_CERT = CA_DIR / "ca.crt"
 
 
-def start_server():
-    # Kontekst TLS serwera definiuje parametry handshake i szyfrowania
+def build_tls_context() -> ssl.SSLContext:
+    # Tworzy kontekst TLS po stronie serwera (parametry handshake i szyfrowania).
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 
-    # Wczytuje certyfikat + klucz serwera (tożsamość serwera w TLS)
+    # Wymusza TLS >= 1.2 bez starych, podatnych wersji
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+
+    # Wyłącza kompresję TLS ochrona m.in. przed atakami typu CRIME
+    context.options |= ssl.OP_NO_COMPRESSION
+
+    # ALPN: uzgadnia protokół aplikacyjny nad TLS
+    context.set_alpn_protocols(ALPN_PROTOCOLS)
+
+    # Tożsamość serwera: certyfikat + klucz prywatny
     context.load_cert_chain(certfile=str(SERVER_CERT), keyfile=str(SERVER_KEY))
 
-    # Serwer wymaga certyfikatu od klienta
+    # mTLS: serwer wymaga certyfikatu klienta
     context.verify_mode = ssl.CERT_REQUIRED
 
-    # Wczytuje zaufane CA, którym będą sprawdzane certyfikaty klientów
+    # Zaufane CA do weryfikacji certyfikatów klientów
     context.load_verify_locations(cafile=str(CA_CERT))
+
+    # Ogranicza zestawy szyfrów dla TLS 1.2 (TLS 1.3 negocjuje je osobno)
+    context.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20')
+    return context
+
+
+
+def start_server():
+    context = build_tls_context()
 
     # Gniazdo TCP IPv4 odbiera nowe połączenia od klientów
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -53,6 +72,9 @@ def start_server():
             try:
                 # wrap_socket wykonuje handshake TLS i przechodzi na kanał szyfrowany
                 with context.wrap_socket(client_socket, server_side=True) as tls_socket:
+                    print(f"Wynegocjowany protokół TLS: {tls_socket.version()}")
+                    print(f"Wynegocjowane ALPN: {tls_socket.selected_alpn_protocol()}")
+                    print(f"Wynegocjowany szyfr: {tls_socket.cipher()}\n")
                     print("Połączenie TLS zostało poprawnie ustanowione! Czekam na dane...\n")
 
                     # Pętla odbioru rekordów TLS niosących dane aplikacyjne

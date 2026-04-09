@@ -6,6 +6,7 @@ from pathlib import Path
 # Endpoint serwera, do którego klient inicjuje sesję
 HOST = 'localhost'
 PORT = 8888
+ALPN_PROTOCOLS = ['secure-chat/1']
 
 # Katalog, w którym leży ten plik (`TCP/`)
 BASE_DIR = Path(__file__).resolve().parent
@@ -18,19 +19,38 @@ CLIENT_CERT = CA_DIR / "client.crt"
 # Prywatny klucz odpowiadający certyfikatowi klienta
 CLIENT_KEY = CA_DIR / "client.key"
 
-
-def start_client():
-    # Kontekst TLS klienta steruje walidacją certyfikatu i handshake
+def build_tls_context() -> ssl.SSLContext:
+    # Tworzy kontekst TLS po stronie klienta
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
-    # Dodaje certyfikat CA do magazynu zaufania klienta
-    context.load_verify_locations(cafile=str(CA_CERT))
+    # Wymusza TLS >= 1.2 bez starych, podatnych wersji
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
 
-    # Włącza weryfikację nazwy hosta z certyfikatu serwera (CN/SAN)
+    # Wyłącza kompresję TLS ochrona m.in. przed atakami typu CRIME
+    context.options |= ssl.OP_NO_COMPRESSION
+
+    # Klient wymaga poprawnego certyfikatu serwera
+    context.verify_mode = ssl.CERT_REQUIRED
+
+    # Sprawdza zgodność nazwy hosta z CN/SAN w certyfikacie serwera
     context.check_hostname = True
 
-    # Klient ładuje swoją tożsamość, aby przedstawić się serwerowi (mTLS)
+    # ALPN: klient i serwer uzgadniają wspólny protokół aplikacyjny
+    context.set_alpn_protocols(ALPN_PROTOCOLS)
+
+    # Preferowane bezpieczne szyfry dla TLS 1.2 (TLS 1.3 negocuje je osobno)
+    context.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20')
+
+    # Zaufane CA do walidacji certyfikatu serwera
+    context.load_verify_locations(cafile=str(CA_CERT))
+
+    # mTLS: klient prezentuje własny certyfikat i klucz
     context.load_cert_chain(certfile=str(CLIENT_CERT), keyfile=str(CLIENT_KEY))
+    return context
+
+
+def start_client():
+    context = build_tls_context()
 
     # Gniazdo TCP IPv4 zestawia transport do serwera
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
@@ -41,6 +61,9 @@ def start_client():
             with context.wrap_socket(client_socket, server_hostname=HOST) as tls_socket:
                 # connect() wykonuje TCP handshake, a potem handshake TLS
                 tls_socket.connect((HOST, PORT))
+                print(f"Wynegocjowany protokół TLS: {tls_socket.version()}")
+                print(f"Wynegocjowane ALPN: {tls_socket.selected_alpn_protocol()}")
+                print(f"Wynegocjowany szyfr: {tls_socket.cipher()}\n")
                 print("Połączenie TLS ustanowione!\n")
 
                 # Pętla wysyła kolejne rekordy TLS z danymi użytkownika
