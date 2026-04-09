@@ -7,9 +7,10 @@ Serwer korzysta z certyfikatu podpisanego przez lokalne **CA** (Certification Au
 
 - `TCP/server.py` uruchamia serwer TCP i otwiera połączenie TLS.
 - `TCP/client.py` łączy się z serwerem, wykonuje handshake TLS i wysyła wiadomości.
-- `QUIC/server.py` uruchamia serwer QUIC (UDP + TLS 1.3).
+- `QUIC/server.py` uruchamia serwer QUIC (UDP + TLS 1.3) i wymusza certyfikat klienta.
 - `QUIC/client.py` łączy się z serwerem QUIC i wysyła wiadomości strumieniami.
 - Cała komunikacja aplikacyjna jest szyfrowana.
+- Wariant TCP i QUIC działa spójnie w trybie mTLS (obie strony prezentują certyfikat).
 
 ## Struktura katalogów
 
@@ -45,9 +46,48 @@ Bezpieczna komunikacja/
 - OpenSSL
 - System Linux, macOS lub Windows
 
+## Jawna polityka TLS/QUIC
+
+- **TCP**: TLS 1.2+ (`ssl.PROTOCOL_TLS_SERVER` / `ssl.PROTOCOL_TLS_CLIENT`, `minimum_version=TLSv1_2`).
+- **QUIC**: TLS 1.3 (wynika z protokołu QUIC i `aioquic`).
+- **mTLS**: serwer wymaga certyfikatu klienta, klient wymaga poprawnego certyfikatu serwera.
+- **Zaufanie**: certyfikaty obu stron muszą być podpisane przez lokalne CA (`Certs/CA/ca.crt`).
+- **Host verification**: klient TCP ma `check_hostname=True`, więc `CN/SAN` certyfikatu serwera musi pasować do hosta.
+- **ALPN**: oba transporty używają jednego identyfikatora aplikacyjnego `secure-chat/1`.
+
+## Model zagrożeń (skrót)
+
+Założenia:
+- Atakujący może podsłuchiwać i modyfikować ruch sieciowy (MITM).
+- Atakujący może próbować podszyć się pod klienta lub serwer.
+- Atakujący nie ma dostępu do poprawnie chronionych kluczy prywatnych.
+
+Chronimy się przed:
+- podsłuchem treści wiadomości (szyfrowanie TLS),
+- podszyciem pod serwer (walidacja certyfikatu serwera przez klienta),
+- podszyciem pod klienta (wymaganie certyfikatu klienta przez serwer),
+- prostą modyfikacją danych w locie (integralność rekordów TLS).
+
+Poza zakresem tego projektu:
+- HSM, OCSP/CRL online, automatyczna rotacja certyfikatów,
+- twarde limity anty-DoS i pełny monitoring produkcyjny.
+
+## Kryteria ocen 3.0 / 4.0 / 5.0
+
+- **3.0**: działa szyfrowana komunikacja TLS na TCP (np. certyfikaty self-signed).
+- **4.0**: działa obustronne uwierzytelnianie certyfikatami (mTLS) dla klienta i serwera.
+- **5.0**: działa klient i serwer QUIC oraz zachowana jest spójna polityka bezpieczeństwa (mTLS + weryfikacja certyfikatów) między TCP i QUIC.
+
+Dla czytelności oceny:
+- `TCP/server.py` + `TCP/client.py` realizują TLS + mTLS na TCP,
+- `QUIC/server.py` + `QUIC/client.py` realizują TLS 1.3 + mTLS na QUIC.
+
 ## Jak działa wariant z CA
 
 Najpierw tworzysz własne CA, potem generujesz klucz i żądanie certyfikatu dla serwera, a następnie podpisujesz to żądanie certyfikatem CA.
+
+> Uwaga: klucze prywatne i wygenerowane certyfikaty to artefakty runtime/deweloperskie.
+> W repo przechowujemy tylko szablony/konfiguracje (np. `.cnf`) i dokumentację, a nie sekrety.
 
 Ten wariant zapewnia **uwierzytelnianie serwera**: klient sprawdza, czy certyfikat serwera został podpisany przez zaufane CA.
 
@@ -245,6 +285,7 @@ Jeżeli zmienisz adres lub port w kodzie, musisz zrobić to w `server.py` i `cli
 - Klucz prywatny CA (`Certs/CA/ca.key`) powinien być chroniony szczególnie mocno.
 - W kliencie jest włączone sprawdzanie nazwy hosta (`check_hostname = True`), więc certyfikat serwera powinien mieć poprawny `CN`/`SAN`.
 - W środowisku produkcyjnym należy włączyć pełną weryfikację certyfikatu i hosta.
+- `.gitignore` ignoruje wygenerowane artefakty PKI (`*.key`, `*.csr`, `*.crt`, `*.pem`, `*.srl`) w katalogu `Certs/`.
 
 ## Najczęstsze problemy
 
