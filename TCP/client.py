@@ -1,24 +1,36 @@
 # Moduły do połączenia TCP i szyfrowania TLS po stronie klienta
 import socket
 import ssl
+from pathlib import Path
 
 # Endpoint serwera, do którego klient inicjuje sesję
 HOST = 'localhost'
 PORT = 8888
+
+# Katalog, w którym leży ten plik (`TCP/`)
+BASE_DIR = Path(__file__).resolve().parent
+# Katalog z certyfikatami podpisanymi przez lokalne CA
+CA_DIR = BASE_DIR.parent / "Certs" / "CA"
+# Certyfikat CA, któremu klient ufa przy weryfikacji serwera
+CA_CERT = CA_DIR / "ca.crt"
+# Certyfikat klienta prezentowany serwerowi (mTLS)
+CLIENT_CERT = CA_DIR / "client.crt"
+# Prywatny klucz odpowiadający certyfikatowi klienta
+CLIENT_KEY = CA_DIR / "client.key"
 
 
 def start_client():
     # Kontekst TLS klienta steruje walidacją certyfikatu i handshake
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
-    # Dodaje certyfikat do magazynu zaufania klienta
-    context.load_verify_locations('../Certs/CA/ca.crt')
+    # Dodaje certyfikat CA do magazynu zaufania klienta
+    context.load_verify_locations(cafile=str(CA_CERT))
 
-    # Wyłącza weryfikację nazwy hosta
+    # Włącza weryfikację nazwy hosta z certyfikatu serwera (CN/SAN)
     context.check_hostname = True
 
-    # Klient ładuje swoją własną tożsamość, aby przedstawić się serwerowi
-    context.load_cert_chain(certfile="../Certs/CA/client.crt", keyfile="../Certs/CA/client.key")
+    # Klient ładuje swoją tożsamość, aby przedstawić się serwerowi (mTLS)
+    context.load_cert_chain(certfile=str(CLIENT_CERT), keyfile=str(CLIENT_KEY))
 
     # Gniazdo TCP IPv4 zestawia transport do serwera
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:

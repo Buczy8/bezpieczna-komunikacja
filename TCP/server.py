@@ -1,24 +1,36 @@
 # Moduły do transportu TCP i szyfrowania TLS
 import socket
 import ssl
+from pathlib import Path
 
 # Endpoint serwera TCP
 HOST = 'localhost'
 PORT = 8888
+
+# Katalog, w którym leży ten plik (`TCP/`)
+BASE_DIR = Path(__file__).resolve().parent
+# Katalog z certyfikatami podpisanymi przez lokalne CA
+CA_DIR = BASE_DIR.parent / "Certs" / "CA"
+# Certyfikat serwera prezentowany klientowi podczas handshake TLS
+SERVER_CERT = CA_DIR / "server.crt"
+# Prywatny klucz odpowiadający certyfikatowi serwera
+SERVER_KEY = CA_DIR / "server.key"
+# Certyfikat urzędu CA używany do weryfikacji certyfikatów klientów
+CA_CERT = CA_DIR / "ca.crt"
 
 
 def start_server():
     # Kontekst TLS serwera definiuje parametry handshake i szyfrowania
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 
-    # Certyfikat i klucz identyfikują serwer podczas handshake TLS
-    context.load_cert_chain(certfile="../Certs/CA/server.crt", keyfile="../Certs/CA/server.key")
+    # Wczytuje certyfikat + klucz serwera (tożsamość serwera w TLS)
+    context.load_cert_chain(certfile=str(SERVER_CERT), keyfile=str(SERVER_KEY))
 
     # Serwer wymaga certyfikatu od klienta
     context.verify_mode = ssl.CERT_REQUIRED
 
-    # Serwer ufa tylko klientom, których certyfikat został wydany przez to CA
-    context.load_verify_locations('../Certs/CA/ca.crt')
+    # Wczytuje zaufane CA, którym będą sprawdzane certyfikaty klientów
+    context.load_verify_locations(cafile=str(CA_CERT))
 
     # Gniazdo TCP IPv4 odbiera nowe połączenia od klientów
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
